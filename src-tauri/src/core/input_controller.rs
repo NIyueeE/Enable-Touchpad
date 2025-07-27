@@ -1,4 +1,4 @@
-// src-tauri/src/core/input_contoller.rs
+// src-tauri/src/core/input_controller.rs
 use crate::core::state::TouchpadState;
 use log::{info, error};
 use std::sync::Arc;
@@ -23,27 +23,6 @@ pub trait TouchpadController: Send + Sync {
 }
 
 // Platform implementations
-#[cfg(target_os = "windows")]
-mod windows;
-#[cfg(target_os = "macos")]
-mod macos;
-#[cfg(target_os = "linux")]
-mod linux;
-
-#[cfg(target_os = "windows")]
-pub use windows::WindowsTouchpadController as PlatformTouchpadController;
-#[cfg(target_os = "macos")]
-pub use macos::MacosTouchpadController as PlatformTouchpadController;
-#[cfg(target_os = "linux")]
-pub use linux::LinuxTouchpadController as PlatformTouchpadController;
-
-impl PlatformTouchpadController {
-    pub fn new() -> Result<Arc<Self>, ControllerError> {
-        Self::create()
-    }
-}
-
-// Windows implementation
 #[cfg(target_os = "windows")]
 mod windows {
     use super::*;
@@ -145,8 +124,67 @@ mod windows {
         }
     }
 }
+#[cfg(target_os = "macos")]
+mod macos {
+    use super::*;
+    use objc::{class, msg_send, sel, sel_impl};
+    use objc::runtime::Object;
+    use objc_foundation::{INSString, NSString};
+    use std::sync::Mutex;
+    use once_cell::sync::Lazy;
+    use log::error;
 
-// Linux implementation
+    static STATE: Lazy<Mutex<TouchpadState>> = Lazy::new(|| Mutex::new(TouchpadState::Disabled));
+
+    pub struct MacosTouchpadController;
+
+    impl MacosTouchpadController {
+        pub fn create() -> Result<Arc<Self>, ControllerError> {
+            Ok(Arc::new(Self))
+        }
+    }
+
+    impl TouchpadController for MacosTouchpadController {
+        fn enable(&self) -> Result<(), ControllerError> {
+            unsafe {
+                let cls = class!(NSAppleScript);
+                let script: *mut Object = msg_send![cls, alloc];
+                let source = NSString::from_str("tell application \"System Preferences\"\nset current pane to pane \"com.apple.preference.trackpad\"\nend tell\ntell application \"System Events\" to tell process \"System Preferences\"\nclick checkbox \"Ignore built-in trackpad when mouse or wireless trackpad is present\" of tab group 1 of window \"Trackpad\"\nend tell");
+                let script: *mut Object = msg_send![script, initWithSource: source];
+                let _: () = msg_send![script, executeAndReturnError: 0 as *mut _];
+            }
+            
+            match STATE.lock() {
+                Ok(mut state) => *state = TouchpadState::Enabled,
+                Err(e) => error!("Failed to acquire STATE lock: {}", e)
+            }
+            
+            Ok(())
+        }
+
+        fn disable(&self) -> Result<(), ControllerError> {
+            // Similar to enable with opposite setting
+            match STATE.lock() {
+                Ok(mut state) => *state = TouchpadState::Disabled,
+                Err(e) => error!("Failed to acquire STATE lock: {}", e)
+            }
+            
+            Ok(())
+        }
+
+        fn get_state(&self) -> Result<TouchpadState, ControllerError> {
+            // macOS doesn't provide API to get current state
+            match STATE.lock() {
+                Ok(state) => Ok(*state),
+                Err(e) => {
+                    error!("Failed to acquire STATE lock: {}", e);
+                    // Return a default state in case of error
+                    Ok(TouchpadState::Disabled)
+                }
+            }
+        }
+    }
+}
 #[cfg(target_os = "linux")]
 mod linux {
     use super::*;
@@ -241,65 +279,15 @@ mod linux {
     }
 }
 
-// macOS implementation
+#[cfg(target_os = "windows")]
+pub use windows::WindowsTouchpadController as PlatformTouchpadController;
 #[cfg(target_os = "macos")]
-mod macos {
-    use super::*;
-    use objc::{class, msg_send, sel, sel_impl};
-    use objc::runtime::Object;
-    use objc_foundation::{INSString, NSString};
-    use std::sync::Mutex;
-    use once_cell::sync::Lazy;
-    use log::error;
+pub use macos::MacosTouchpadController as PlatformTouchpadController;
+#[cfg(target_os = "linux")]
+pub use linux::LinuxTouchpadController as PlatformTouchpadController;
 
-    static STATE: Lazy<Mutex<TouchpadState>> = Lazy::new(|| Mutex::new(TouchpadState::Disabled));
-
-    pub struct MacosTouchpadController;
-
-    impl MacosTouchpadController {
-        pub fn create() -> Result<Arc<Self>, ControllerError> {
-            Ok(Arc::new(Self))
-        }
-    }
-
-    impl TouchpadController for MacosTouchpadController {
-        fn enable(&self) -> Result<(), ControllerError> {
-            unsafe {
-                let cls = class!(NSAppleScript);
-                let script: *mut Object = msg_send![cls, alloc];
-                let source = NSString::from_str("tell application \"System Preferences\"\nset current pane to pane \"com.apple.preference.trackpad\"\nend tell\ntell application \"System Events\" to tell process \"System Preferences\"\nclick checkbox \"Ignore built-in trackpad when mouse or wireless trackpad is present\" of tab group 1 of window \"Trackpad\"\nend tell");
-                let script: *mut Object = msg_send![script, initWithSource: source];
-                let _: () = msg_send![script, executeAndReturnError: 0 as *mut _];
-            }
-            
-            match STATE.lock() {
-                Ok(mut state) => *state = TouchpadState::Enabled,
-                Err(e) => error!("Failed to acquire STATE lock: {}", e)
-            }
-            
-            Ok(())
-        }
-
-        fn disable(&self) -> Result<(), ControllerError> {
-            // Similar to enable with opposite setting
-            match STATE.lock() {
-                Ok(mut state) => *state = TouchpadState::Disabled,
-                Err(e) => error!("Failed to acquire STATE lock: {}", e)
-            }
-            
-            Ok(())
-        }
-
-        fn get_state(&self) -> Result<TouchpadState, ControllerError> {
-            // macOS doesn't provide API to get current state
-            match STATE.lock() {
-                Ok(state) => Ok(*state),
-                Err(e) => {
-                    error!("Failed to acquire STATE lock: {}", e);
-                    // Return a default state in case of error
-                    Ok(TouchpadState::Disabled)
-                }
-            }
-        }
+impl PlatformTouchpadController {
+    pub fn new() -> Result<Arc<Self>, ControllerError> {
+        Self::create()
     }
 }

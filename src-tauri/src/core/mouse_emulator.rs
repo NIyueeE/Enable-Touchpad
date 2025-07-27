@@ -1,5 +1,5 @@
 // src-tauri/src/core/mouse_emulator.rs
-use enigo::{Enigo, MouseControllable, MouseButton};
+use enigo::{Enigo, MouseControllable, MouseButton, Settings};
 use rdev::Key;
 use std::sync::{Arc, Mutex};
 use crate::core::state::MouseKeybindings;
@@ -17,7 +17,7 @@ pub struct MouseEmulator {
 impl MouseEmulator {
     pub fn new() -> Arc<Self> {
         let emulator = Arc::new(Self {
-            enigo: Mutex::new(Enigo::new()),
+            enigo: Mutex::new(Enigo::new(&Settings::default()).unwrap()),
             move_queue: Mutex::new(Vec::new()),
             last_move_time: Mutex::new(Instant::now()),
             key_state: Mutex::new(Vec::new()),
