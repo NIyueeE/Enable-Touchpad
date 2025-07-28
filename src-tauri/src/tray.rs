@@ -1,64 +1,46 @@
 use tauri::{
-    AppHandle, CustomMenuItem, Manager, SystemTray, SystemTrayEvent, SystemTrayMenu,
-    SystemTrayMenuItem,
+    menu::{Menu, MenuItem},
+    tray::{MouseButton, TrayIconBuilder, TrayIconEvent},
+    App, AppHandle, Manager, Result as TauriResult,
 };
-use crate::commands;
-use crate::core::state::SharedState;
-use crate::core::input_controller::PlatformTouchpadController;
-use log::error;
 
-pub fn create_tray() -> SystemTray {
-    let quit = CustomMenuItem::new("quit".to_string(), "退出");
-    let settings = CustomMenuItem::new("settings".to_string(), "设置");
-    let enable = CustomMenuItem::new("enable".to_string(), "启用触摸板");
-    let disable = CustomMenuItem::new("disable".to_string(), "禁用触摸板");
+pub fn setup_tray(app: &App) -> TauriResult<()> {
+    let quit_item = MenuItem::with_id(app, "quit", "quit", true, None::<&str>)?;
+    let settings_item = MenuItem::with_id(app, "settings", "settings", true, None::<&str>)?;
+    let pause_item = MenuItem::with_id(app, "pause", "pause", true, None::<&str>)?;
     
-    let tray_menu = SystemTrayMenu::new()
-        .add_item(enable)
-        .add_item(disable)
-        .add_native_item(SystemTrayMenuItem::Separator)
-        .add_item(settings)
-        .add_native_item(SystemTrayMenuItem::Separator)
-        .add_item(quit);
+    let menu = Menu::with_items(app, &[&quit_item, &settings_item, &pause_item])?;
     
-    SystemTray::new().with_menu(tray_menu)
+    // 创建托盘图标
+    let _tray = TrayIconBuilder::new()
+        .menu(&menu)
+        .icon(app.default_window_icon().unwrap().clone())
+        .tooltip("Enable Touchpad")
+        .on_menu_event(handle_menu_event)
+        .on_tray_icon_event(handle_tray_event)
+        .build(app)?;
+
+    Ok(())
+}
+fn handle_menu_event(app: &AppHandle, event: tauri::menu::MenuEvent) {
+    match event.id.as_ref() {
+        "quit" => {
+            app.exit(0);
+        }
+
+        _ => {}
+    }
 }
 
-pub fn handle_tray_event(app: &AppHandle, event: SystemTrayEvent) {
-    match event {
-        SystemTrayEvent::MenuItemClick { id, .. } => match id.as_str() {
-            "quit" => {
-                app.exit(0);
-            }
-            "settings" => {
-                commands::open_settings_window(app);
-            }
-            "enable" => {
-                // Enable touchpad
-                if let Some(state) = app.try_state::<SharedState>() {
-                    // We would need access to the touchpad controller here
-                    // This is a simplified implementation - in a full implementation,
-                    // we would need to store the controller in the app state
-                    match state.touchpad_state.try_write() {
-                        Some(mut touchpad_state) => *touchpad_state = crate::core::state::TouchpadState::Enabled,
-                        None => error!("Failed to acquire touchpad_state write lock")
-                    }
-                }
-            }
-            "disable" => {
-                // Disable touchpad
-                if let Some(state) = app.try_state::<SharedState>() {
-                    // We would need access to the touchpad controller here
-                    // This is a simplified implementation - in a full implementation,
-                    // we would need to store the controller in the app state
-                    match state.touchpad_state.try_write() {
-                        Some(mut touchpad_state) => *touchpad_state = crate::core::state::TouchpadState::Disabled,
-                        None => error!("Failed to acquire touchpad_state write lock")
-                    }
-                }
-            }
-            _ => {}
-        },
-        _ => {}
+fn handle_tray_event(_tray: &tauri::tray::TrayIcon, event: TrayIconEvent) {
+    if let TrayIconEvent::Click {
+        button: MouseButton::Left,
+        button_state: tauri::tray::MouseButtonState::Up,
+        ..
+    } = event
+    {
+        
+        // 左键点击处理逻辑
+        println!("托盘图标被左键点击");
     }
 }

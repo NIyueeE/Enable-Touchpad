@@ -6,13 +6,13 @@ mod tray;
 mod commands;
 mod osd;
 
-use tauri::{Manager, utils::config::AppUrl};
+use tauri::{Manager};
 use core::state::{AppState, SharedState, TouchpadState};
 use core::input_controller::PlatformTouchpadController;
 use core::hotkey_manager::{HotkeyManager, HotkeyEvent};
 use core::mouse_emulator::MouseEmulator;
 use osd::OSDManager;
-use tray::{create_tray, handle_tray_event};
+use tray::setup_tray;
 use log::{info, error, warn};
 use crossbeam::channel::{unbounded, Receiver};
 use std::sync::Arc;
@@ -20,6 +20,7 @@ use std::sync::Arc;
 fn main() {
     if let Err(e) = simple_logger::init_with_level(log::Level::Info) {
         eprintln!("Failed to initialize logger: {}", e);
+        std::process::exit(1);
     }
     info!("Starting Touchpad Control");
 
@@ -63,16 +64,17 @@ fn main() {
             );
 
             // Hide main window (tray-only app)
-            if let Some(window) = app.get_window("main") {
+            if let Some(window) = app.get_webview_window("main") {
                 if let Err(e) = window.hide() {
                     warn!("Failed to hide main window: {}", e);
                 }
             }
+            
+            // Setup system tray
+            setup_tray(app)?;
 
             Ok(())
         })
-        .system_tray(create_tray())
-        .on_system_tray_event(handle_tray_event)
         .invoke_handler(tauri::generate_handler![
             commands::get_settings,
             commands::save_settings,

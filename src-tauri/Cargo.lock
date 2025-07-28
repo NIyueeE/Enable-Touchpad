@@ -1039,6 +1039,7 @@ dependencies = [
  "tauri",
  "tauri-build",
  "tauri-plugin-opener",
+ "thiserror 1.0.69",
  "windows 0.56.0",
  "x11",
 ]
