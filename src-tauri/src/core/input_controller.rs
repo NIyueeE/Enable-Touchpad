@@ -1,10 +1,11 @@
 // src-tauri/src/core/input_controller.rs
 use crate::core::state::TouchpadState;
-use log::{info, error};
+use log::error;
 use std::sync::Arc;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
+#[allow(dead_code)]
 pub enum ControllerError {
     #[error("Linux: Failed to find touchpad device")]
     LinuxDeviceNotFound,
@@ -16,6 +17,8 @@ pub enum ControllerError {
     UnsupportedPlatform,
 }
 
+#[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
+#[allow(dead_code)]
 pub trait TouchpadController: Send + Sync {
     fn enable(&self) -> Result<(), ControllerError>;
     fn disable(&self) -> Result<(), ControllerError>;
@@ -261,7 +264,12 @@ mod linux {
                 .map_err(|_| ControllerError::LinuxDeviceNotFound)?;
             
             let output_str = String::from_utf8_lossy(&output.stdout);
-            let enabled = output_str.contains("Device Enabled (");
+            // Parse the actual device state from xinput output
+            let enabled = if let Some(line) = output_str.lines().find(|line| line.contains("Device Enabled")) {
+                line.trim_end().ends_with("(1)")
+            } else {
+                false
+            };
             
             let state = if enabled {
                 TouchpadState::Enabled

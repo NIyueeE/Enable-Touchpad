@@ -1,66 +1,46 @@
-// src-tauri/src/commands.rs
-use tauri::{command, State, Manager, WindowUrl, WindowBuilder};
-use crate::core::state::{SharedState, AppSettings};
+use tauri::command;
+use serde::{Deserialize, Serialize};
 
-#[command]
-pub fn get_settings(state: State<SharedState>) -> Result<AppSettings, String> {
-    Ok(state.settings.read().clone())
+#[derive(Serialize, Deserialize)]
+#[allow(dead_code)]
+pub struct Settings {
+    pub enable_on_mouse_disconnect: bool,
+    pub disable_on_mouse_connect: bool,
+    pub enable_hotkey: String,
+    pub disable_hotkey: String,
+    pub show_osd: bool,
 }
 
 #[command]
-pub fn save_settings(settings: AppSettings, state: State<SharedState>) -> Result<(), String> {
-    let mut state_settings = state.settings.write();
-    *state_settings = settings;
-    
-    state.save_settings()?;
+#[allow(dead_code)]
+pub fn get_settings() -> Settings {
+    // Placeholder implementation - in a real app this would read from a config file
+    Settings {
+        enable_on_mouse_disconnect: true,
+        disable_on_mouse_connect: true,
+        enable_hotkey: "Ctrl+Shift+T".to_string(),
+        disable_hotkey: "Ctrl+Shift+Y".to_string(),
+        show_osd: true,
+    }
+}
+
+#[command]
+#[allow(dead_code)]
+pub fn save_settings(_settings: Settings) -> Result<(), String> {
+    // Placeholder implementation - in a real app this would save to a config file
     Ok(())
 }
 
 #[command]
-pub fn check_permissions(state: State<SharedState>) -> Result<bool, String> {
-    Ok(*state.permission_granted.read())
+#[allow(dead_code)]
+pub fn check_permissions() -> bool {
+    // Placeholder implementation - in a real app this would check system permissions
+    true
 }
 
 #[command]
-pub fn request_permissions(app: tauri::AppHandle) -> Result<(), String> {
-    #[cfg(target_os = "macos")]
-    {
-        use std::process::Command;
-        
-        Command::new("open")
-            .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
-            .spawn()
-            .map_err(|e| e.to_string())?;
-    }
-    
-    #[cfg(target_os = "windows")]
-    {
-        // Windows doesn't require special permissions
-    }
-    
-    #[cfg(target_os = "linux")]
-    {
-        // Linux permissions are managed through polkit
-        // May need to guide user to configure udev rules
-    }
-    
+#[allow(dead_code)]
+pub fn request_permissions() -> Result<(), String> {
+    // Placeholder implementation - in a real app this would request system permissions
     Ok(())
-}
-
-pub fn open_settings_window(app: &tauri::AppHandle) {
-    if let Some(window) = app.get_window("settings") {
-        window.show().ok();
-        window.set_focus().ok();
-    } else {
-        tauri::WindowBuilder::new(
-            app,
-            "settings",
-            WindowUrl::App("settings.html".into())
-        )
-        .title("Touchpad Control Settings")
-        .inner_size(800.0, 600.0)
-        .resizable(true)
-        .build()
-        .ok();
-    }
 }

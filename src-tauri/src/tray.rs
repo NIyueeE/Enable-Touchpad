@@ -1,9 +1,10 @@
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, TrayIconBuilder, TrayIconEvent},
-    App, AppHandle, Manager, Result as TauriResult,
+    App, AppHandle, Result as TauriResult,
 };
 
+#[allow(dead_code)]
 pub fn setup_tray(app: &App) -> TauriResult<()> {
     let quit_item = MenuItem::with_id(app, "quit", "quit", true, None::<&str>)?;
     let settings_item = MenuItem::with_id(app, "settings", "settings", true, None::<&str>)?;
@@ -22,6 +23,8 @@ pub fn setup_tray(app: &App) -> TauriResult<()> {
 
     Ok(())
 }
+
+#[allow(dead_code)]
 fn handle_menu_event(app: &AppHandle, event: tauri::menu::MenuEvent) {
     match event.id.as_ref() {
         "quit" => {
@@ -32,6 +35,7 @@ fn handle_menu_event(app: &AppHandle, event: tauri::menu::MenuEvent) {
     }
 }
 
+#[allow(dead_code)]
 fn handle_tray_event(_tray: &tauri::tray::TrayIcon, event: TrayIconEvent) {
     if let TrayIconEvent::Click {
         button: MouseButton::Left,
